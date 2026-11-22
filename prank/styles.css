@@ -1,0 +1,983 @@
+/* ==========================================================================
+   styles.css — 整蛊页面样式
+   阶段 3-1：基础骨架 + 全局样式（背景 / 字体 / 容器 / 常驻出口）
+   后续：3-2 弹窗组件样式、3-4 逐幕内容与动效
+   ========================================================================== */
+
+/* ---------- 1. 设计变量 ---------- */
+:root {
+  /* 深色科技风底色（比初版更亮，留出彩色层次） */
+  --bg-0: #0b1226;
+  --bg-1: #0d1426;
+  --panel: #121a30;
+  --panel-2: #1a2440;
+  --line: rgba(255, 255, 255, 0.08);
+
+  --text: #e8eefc;
+  --text-dim: #93a1c0;
+
+  --accent: #4f8cff;
+  --accent-2: #22d3ee;
+  --danger: #ff5d6c;
+  --ok: #38d39f;
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+
+  /* 层级：弹窗每层 +10，遮罩为同层 -1；逃生按钮永远最高 */
+  --z-backdrop: 999;
+  --z-dialog: 1000;
+  --z-hint: 3000;
+  --z-surrender: 9000;
+
+  /* iOS 安全区 */
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", system-ui, sans-serif;
+}
+
+/* ---------- 2. 重置 ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-ui);
+  color: var(--text);
+  /* 彩色底：蓝 / 青 / 紫三团柔光，不再是死黑 */
+  background:
+    radial-gradient(60% 55% at 12% 8%, rgba(79, 140, 255, 0.26), transparent 70%),
+    radial-gradient(50% 50% at 88% 18%, rgba(34, 211, 238, 0.18), transparent 70%),
+    radial-gradient(65% 65% at 72% 96%, rgba(168, 85, 247, 0.22), transparent 72%),
+    var(--bg-0);
+  overflow: hidden; /* 全屏体验，滚动只发生在屏幕/弹窗内部 */
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* ---------- 3. 应用容器与动态背景 ---------- */
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  height: 100dvh; /* 移动端地址栏适配 */
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* 缓慢流动的柔光（无闪烁） */
+#app::before,
+#app::after {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  z-index: -3;
+  pointer-events: none;
+}
+
+#app::before {
+  background:
+    radial-gradient(40% 40% at 20% 20%, rgba(79, 140, 255, 0.24), transparent 70%),
+    radial-gradient(45% 45% at 80% 30%, rgba(34, 211, 238, 0.16), transparent 70%),
+    radial-gradient(50% 50% at 50% 90%, rgba(140, 100, 255, 0.20), transparent 70%);
+  animation: bg-drift 18s ease-in-out infinite alternate;
+}
+
+/* 细网格，增加“系统感” */
+#app::after {
+  z-index: -2;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: radial-gradient(circle at 50% 40%, #000 25%, transparent 78%);
+  mask-image: radial-gradient(circle at 50% 40%, #000 25%, transparent 78%);
+  opacity: 0.55;
+}
+
+/* ---------- 3.1 光标跟随光晕 ----------
+   JS 每帧更新 --gx / --gy（位置）与 --glow-hue / --glow-light（颜色），
+   光晕带缓动跟随鼠标，颜色随水平位置在 蓝→青→紫 之间偏移。 */
+.cursor-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 720px;
+  height: 720px;
+  margin: -360px 0 0 -360px;
+  border-radius: 50%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(var(--gx, 50vw), var(--gy, 38vh), 0);
+  background: radial-gradient(
+    circle,
+    hsla(var(--glow-hue, 210), 95%, var(--glow-light, 66%), 0.26) 0%,
+    hsla(var(--glow-hue, 210), 95%, var(--glow-light, 66%), 0.13) 32%,
+    hsla(var(--glow-hue, 210), 95%, var(--glow-light, 66%), 0.05) 52%,
+    transparent 68%
+  );
+  filter: blur(10px);
+  transition: opacity 0.6s ease;
+  will-change: transform;
+}
+
+.cursor-glow.is-on {
+  opacity: 1;
+}
+
+@keyframes bg-drift {
+  from {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2%, 2%, 0) scale(1.06);
+  }
+}
+
+/* ---------- 4. 舞台与屏幕切换 ---------- */
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.screen.is-active {
+  display: flex;
+  animation: screen-in 0.5s ease both;
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 第 6 幕：全屏轻微震动（由 JS 加 .is-shaking） */
+.screen.is-shaking {
+  animation: screen-shake 0.4s linear infinite;
+}
+
+@keyframes screen-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-2px, 1px); }
+  40% { transform: translate(2px, -1px); }
+  60% { transform: translate(-1px, -2px); }
+  80% { transform: translate(1px, 2px); }
+}
+
+/* ---------- 5. 第 1 幕：假加载 ---------- */
+.boot__logo {
+  width: 46px;
+  height: 46px;
+  margin-bottom: 22px;
+  display: grid;
+  place-items: center;
+}
+
+.boot__ring {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid rgba(79, 140, 255, 0.18);
+  border-top-color: var(--accent);
+  border-right-color: var(--accent-2);
+  animation: spin 1.1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.boot__title {
+  margin: 0;
+  font-size: clamp(18px, 4.5vw, 26px);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.boot__bar {
+  width: min(420px, 80vw);
+  height: 10px;
+  margin-top: 28px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.boot__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 18px rgba(79, 140, 255, 0.55);
+  transition: width 0.45s ease;
+}
+
+.boot__meta {
+  display: flex;
+  justify-content: space-between;
+  width: min(420px, 80vw);
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.boot__pct {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 卡在 99% 时数字轻微抖动（幅度 1px，非闪烁） */
+.boot__pct.is-stuck {
+  animation: jitter 0.35s steps(2, end) infinite;
+}
+
+@keyframes jitter {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+  100% { transform: translateY(0); }
+}
+
+.boot__hint {
+  margin: 34px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+/* ---------- 6. 弹窗层容器（组件样式在 3-2 补充） ---------- */
+.dialog-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* 只有弹窗本体接收点击 */
+  z-index: var(--z-dialog);
+}
+
+.dialog-layer > * {
+  pointer-events: auto;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-backdrop);
+  background: rgba(3, 6, 14, 0.55);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.backdrop[hidden] {
+  display: none;
+}
+
+/* ---------- 6.1 弹窗组件（阶段 3-2） ---------- */
+.dialog {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(72vh, 620px);
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  background: linear-gradient(180deg, #1a2647 0%, #121a30 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(79, 140, 255, 0.08);
+  /* --off 由 JS 按层级写入，桌面端形成阶梯套娃；小屏归零 */
+  transform: translate(-50%, -50%) translate(var(--off, 0px), var(--off, 0px));
+  animation: dialog-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+  will-change: transform, opacity;
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--off, 0px), var(--off, 0px)) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(var(--off, 0px), var(--off, 0px)) scale(1);
+  }
+}
+
+/* 入场动画播完后由 JS 加上，防止后续动效类切换时重播入场 */
+.dialog.is-settled {
+  animation: none;
+}
+
+.dialog.is-closing {
+  animation: dialog-out 0.18s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--off, 0px), var(--off, 0px)) scale(0.94);
+  }
+}
+
+/* 下层弹窗变暗（不改变 opacity，避免与 fill-mode 冲突） */
+.dialog.is-dimmed::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(4, 7, 16, 0.38);
+  pointer-events: none;
+}
+
+.dialog__head {
+  display: flex;
+  align-items: center;
+  padding: 16px 16px 0;
+}
+
+.dialog__title {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.dialog__body {
+  min-height: 0;
+  padding: 12px 16px;
+  overflow-y: auto;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.65;
+  text-align: left;
+}
+
+.dialog__body code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+}
+
+.dialog__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+/* 按钮 */
+.btn {
+  min-width: 84px;
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:focus-visible {
+  outline: 2px solid rgba(79, 140, 255, 0.6);
+  outline-offset: 2px;
+}
+
+.btn--primary {
+  border-color: rgba(79, 140, 255, 0.6);
+  background: linear-gradient(180deg, #4f8cff, #3b6fd6);
+  color: #fff;
+}
+
+.btn--primary:hover {
+  background: linear-gradient(180deg, #6199ff, #4278e0);
+}
+
+.btn--danger {
+  border-color: rgba(255, 93, 108, 0.6);
+  background: linear-gradient(180deg, #ff6b78, #e0485a);
+  color: #fff;
+}
+
+.btn--danger:hover {
+  background: linear-gradient(180deg, #ff7c88, #ea5263);
+}
+
+/* 小型浮窗（第 5 幕“后台进程”会用） */
+.dialog--mini {
+  width: min(300px, calc(100vw - 40px));
+}
+
+.dialog--mini .dialog__head {
+  padding-bottom: 12px;
+}
+
+/* ---------- 6.2 经典 Windows 报错风格（终局吓一下） ---------- */
+.dialog--win {
+  width: min(430px, calc(100vw - 28px));
+  border: 1px solid #003c74;
+  border-radius: 0;
+  background: #ece9d8;
+  color: #000;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+
+.dialog--win .dialog__head {
+  padding: 6px 10px;
+  background: linear-gradient(180deg, #0a5fe0 0%, #0050c8 55%, #003c9e 100%);
+  border-bottom: 1px solid #002b73;
+}
+
+.dialog--win .dialog__title {
+  color: #fff;
+  font-family: Tahoma, "Segoe UI", "SimSun", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+.dialog--win .dialog__body {
+  padding: 18px 16px;
+  color: #111;
+  background: #ece9d8;
+  font-family: Tahoma, "SimSun", sans-serif;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.dialog--win .dialog__body p {
+  margin: 0 0 8px;
+}
+
+.dialog--win .dialog__foot {
+  padding: 0 16px 14px;
+  background: #ece9d8;
+}
+
+.btn--win {
+  min-width: 86px;
+  padding: 5px 14px;
+  border: 1px solid #7f9db9;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #fdfdfd, #e3e3e3);
+  color: #000;
+  font-family: Tahoma, "SimSun", sans-serif;
+  font-size: 12px;
+}
+
+.btn--win:hover {
+  background: linear-gradient(180deg, #ffffff, #dcdcdc);
+}
+
+.btn--win:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+}
+
+/* ---------- 6.3 弹窗内的进度条 / 抖动 / 假权限 ---------- */
+.mini-progress {
+  width: 100%;
+  height: 8px;
+  margin: 10px 0 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.mini-progress__fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width 1.5s linear;
+}
+
+.dialog.is-shaking {
+  animation: dialog-shake 0.42s ease-in-out;
+}
+
+@keyframes dialog-shake {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) translate(var(--off, 0px), var(--off, 0px));
+  }
+  20% {
+    transform: translate(-50%, -50%) translate(var(--off, 0px), var(--off, 0px)) translate(3px, 0);
+  }
+  40% {
+    transform: translate(-50%, -50%) translate(var(--off, 0px), var(--off, 0px)) translate(-3px, 1px);
+  }
+  60% {
+    transform: translate(-50%, -50%) translate(var(--off, 0px), var(--off, 0px)) translate(2px, -1px);
+  }
+  80% {
+    transform: translate(-50%, -50%) translate(var(--off, 0px), var(--off, 0px)) translate(-1px, 2px);
+  }
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn:disabled:hover {
+  transform: none;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.fake-perm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.fake-perm input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: not-allowed;
+}
+
+/* 第 5 幕小窗：带一点旋转的入场 */
+.dialog--proc {
+  animation: proc-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+@keyframes proc-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--off, 0px), var(--off, 0px)) scale(0.86) rotate(-3deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(var(--off, 0px), var(--off, 0px)) scale(1) rotate(0deg);
+  }
+}
+
+/* 第 6 幕：黑屏过渡 */
+.blackout {
+  position: fixed;
+  inset: 0;
+  /* 低于弹窗层（1000），保证黑屏期间「我认输」的告别弹窗仍可见 */
+  z-index: 900;
+  background: #000;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.blackout.is-visible {
+  opacity: 1;
+}
+
+/* ---------- 6.4 第 7 幕：满屏系统报错 + 光标群 ---------- */
+/* 满屏面板：多个“窗口堆”随机散布、彼此叠压，不排整齐 */
+.error-wall {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+}
+
+/* 按 Enter 后报错墙淡出，给光标拼字留出干净背景 */
+.error-wall.is-clearing {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+/* 仿 Windows 系统报错窗（参照截图：VBA 标题栏 + 红色圆 X + 确定/帮助） */
+.win-error {
+  --tilt: 0deg;
+  position: absolute;
+  width: clamp(240px, 26vw, 380px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #c7c7c7;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  transform: rotate(var(--tilt));
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: #1b1b1b;
+  cursor: pointer;
+  animation: win-error-in 0.28s ease both;
+}
+
+@keyframes win-error-in {
+  from {
+    opacity: 0;
+    transform: rotate(var(--tilt)) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(var(--tilt)) scale(1);
+  }
+}
+
+.win-error__titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px 6px;
+  background: #f7f7f7;
+  border-bottom: 1px solid #ededed;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1b1b1b;
+}
+
+.win-error__titlebar > span:first-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.win-error__close {
+  flex: none;
+  font-size: 15px;
+  line-height: 1;
+  color: #5f5f5f;
+}
+
+.win-error__body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 0;
+  padding: 14px 16px;
+  overflow: hidden;
+  background: #fff;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.win-error__body p {
+  margin: 0;
+}
+
+/* 红色圆形 X 图标 */
+.win-error__icon {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #c42b1c;
+}
+
+.win-error__icon::before,
+.win-error__icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+  background: #fff;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.win-error__icon::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.win-error__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 9px 12px;
+  background: #f3f3f3;
+  border-top: 1px solid #e3e3e3;
+}
+
+.win-btn {
+  min-width: 78px;
+  padding: 4px 14px;
+  border: 1px solid #8a8a8a;
+  border-radius: 4px;
+  background: #fdfdfd;
+  color: #1b1b1b;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.win-btn--primary {
+  outline: 2px dashed #2f6fd0;
+  outline-offset: 1px;
+}
+
+/* 假光标：由 JS 每帧驱动随机漂移 */
+.fake-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2200;
+  background: #fff;
+  clip-path: polygon(0 0, 0 100%, 30% 72%, 46% 100%, 60% 92%, 44% 66%, 76% 66%);
+  filter: drop-shadow(0 0 1px #000) drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.8));
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* 隐藏真实光标；角落「我认输」仍会显示指针，保证找得到出口 */
+body.is-cursor-hidden,
+body.is-cursor-hidden .screen,
+body.is-cursor-hidden .screen * {
+  cursor: none !important;
+}
+
+/* ---------- 7. 常驻出口与提示 ---------- */
+/* 真出口：做得低调，但仍在固定角落、hover 后清晰可见 */
+.surrender {
+  position: fixed;
+  right: calc(10px + var(--safe-r));
+  bottom: calc(8px + var(--safe-b));
+  z-index: var(--z-surrender);
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  opacity: 0.16;
+  transition: opacity 0.25s ease, color 0.25s ease, background-color 0.25s ease;
+}
+
+.surrender:hover,
+.surrender:focus-visible {
+  opacity: 0.95;
+  color: var(--text);
+  background: rgba(18, 26, 48, 0.6);
+  outline: none;
+}
+
+.surrender:active {
+  transform: scale(0.97);
+}
+
+/* ---------- 7.1 全屏系统的文字（第 6 / 7 幕占位） ---------- */
+.sys-line {
+  margin: 0 0 10px;
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  color: var(--accent-2);
+}
+
+.sys-title {
+  margin: 0 0 26px;
+  font-size: clamp(20px, 5vw, 30px);
+  font-weight: 600;
+}
+
+.countdown {
+  margin: 0;
+  font-size: 64px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  text-shadow: 0 0 30px rgba(79, 140, 255, 0.45);
+}
+
+.muted {
+  color: var(--text-dim);
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+/* ---------- 7.2 揭晓页 ---------- */
+.reveal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(520px, 100%);
+}
+
+.reveal__kicker {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.35em;
+  color: var(--accent-2);
+  text-transform: uppercase;
+}
+
+.reveal__title {
+  margin: 10px 0 14px;
+  font-size: clamp(30px, 7vw, 46px);
+  font-weight: 700;
+  background: linear-gradient(90deg, #8ab4ff, #22d3ee, #b78cff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.reveal__text {
+  margin: 0 0 28px;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.reveal__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 28px;
+}
+
+.reveal__stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.reveal__stats b {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.reveal__stats span {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.reveal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* 终局：只放两个大按钮 */
+.final {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn--big {
+  min-width: 160px;
+  padding: 16px 26px;
+  font-size: 17px;
+  border-radius: 12px;
+}
+
+/* ---------- 8. 小屏适配 ---------- */
+@media (max-width: 480px) {
+  .boot__bar,
+  .boot__meta {
+    width: 78vw;
+  }
+
+  .boot__title {
+    font-size: 19px;
+  }
+
+  /* 小屏不偏移，弹窗始终居中、不越界 */
+  .dialog {
+    --off: 0px !important;
+  }
+
+  /* 两个后台进程小窗在手机上上下错开，避免完全重叠 */
+  .dialog--proc-a {
+    top: 38%;
+  }
+
+  .dialog--proc-b {
+    top: 62%;
+  }
+
+  /* 第 7 幕报错窗在手机上占大半屏宽 */
+  .win-error {
+    width: 86vw;
+  }
+
+  .reveal__stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .countdown {
+    font-size: 52px;
+  }
+}
+
+/* ---------- 9. 减少动态偏好（无障碍） ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  /* 假光标完全隐藏，避免静止在角落显得突兀 */
+  .fake-cursor {
+    display: none;
+  }
+}

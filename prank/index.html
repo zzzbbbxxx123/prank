@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#070b16" />
+  <title>正在初始化…</title>
+  <!-- 内联图标，避免额外请求 -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='10' fill='%234f8cff'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- 光标跟随的色彩光晕（鼠标移到哪，哪片颜色就变化） -->
+    <div id="cursor-glow" class="cursor-glow" aria-hidden="true"></div>
+
+    <!-- ============ 舞台层：每一幕占满全屏，由 JS 切换 .is-active ============ -->
+    <main id="stage" class="stage">
+
+      <!-- 第 1 幕：假加载（当前为静态占位，进度由 3-3 接管） -->
+      <section id="screen-boot" class="screen boot is-active" data-act="1">
+        <div class="boot__logo" aria-hidden="true"><span class="boot__ring"></span></div>
+        <h1 class="boot__title">正在初始化体验…</h1>
+
+        <div class="boot__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="99">
+          <div class="boot__fill" id="boot-fill" style="width:99%"></div>
+        </div>
+
+        <div class="boot__meta">
+          <span>正在加载资源</span>
+          <span class="boot__pct is-stuck" id="boot-pct">99%</span>
+        </div>
+
+        <p class="boot__hint">请稍候，体验即将开始</p>
+      </section>
+
+      <!-- 第 8 幕揭晓页等其余屏幕，后续阶段由 JS 生成 -->
+    </main>
+
+    <!-- ============ 弹窗层：所有自绘弹窗挂在这里（3-2 接入管理器） ============ -->
+    <div id="dialog-layer" class="dialog-layer" aria-live="polite"></div>
+
+    <!-- 遮罩基底，实际透明度 / 层级由 JS 按弹窗栈控制 -->
+    <div id="backdrop" class="backdrop" hidden></div>
+
+    <!-- ============ 常驻真出口：任意时刻可点（铁律：必须能退出） ============ -->
+    <button id="surrender" class="surrender" type="button" title="点这里可以直接结束整蛊">
+      我认输
+    </button>
+
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
